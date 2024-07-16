@@ -1,0 +1,98 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/access/Ownable.sol";
+
+contract CryptoTradingSignalsHub is Ownable {
+    struct Signal {
+        address provider;
+        string symbol;
+        uint256 timestamp;
+        string content;
+        bool isActive;
+    }
+
+    // Mapping from signal ID to Signal
+    mapping(uint256 => Signal) public signals;
+
+    // Total number of signals
+    uint256 public totalSignals;
+
+    // Events
+    event SignalPublished(uint256 indexed signalId, address indexed provider, string symbol, uint256 timestamp, string content);
+    event SignalActivated(uint256 indexed signalId);
+    event SignalDeactivated(uint256 indexed signalId);
+
+    // Modifier to check if the caller is the signal provider
+    modifier onlyProvider(uint256 signalId) {
+        require(signals[signalId].provider == msg.sender, "Only signal provider can perform this action");
+        _;
+    }
+
+    // Publish a new trading signal
+    function publishSignal(string memory symbol, string memory content) external {
+        require(bytes(symbol).length > 0, "Symbol must not be empty");
+        require(bytes(content).length > 0, "Content must not be empty");
+
+        uint256 signalId = totalSignals++;
+
+        signals[signalId] = Signal({
+            provider: msg.sender,
+            symbol: symbol,
+            timestamp: block.timestamp,
+            content: content,
+            isActive: true
+        });
+
+        emit SignalPublished(signalId, msg.sender, symbol, block.timestamp, content);
+    }
+
+    // Activate a signal (only provider)
+    function activateSignal(uint256 signalId) external onlyProvider(signalId) {
+        require(!signals[signalId].isActive, "Signal is already active");
+        signals[signalId].isActive = true;
+        emit SignalActivated(signalId);
+    }
+
+    // Deactivate a signal (only provider)
+    function deactivateSignal(uint256 signalId) external onlyProvider(signalId) {
+        require(signals[signalId].isActive, "Signal is already inactive");
+        signals[signalId].isActive = false;
+        emit SignalDeactivated(signalId);
+    }
+
+    // Subscribe to a signal
+    function subscribeToSignal(uint256 signalId) external {
+        require(signalId < totalSignals, "Invalid signal ID");
+        require(signals[signalId].isActive, "Signal is not active");
+
+        // Here you can implement your own subscription logic
+        // For demonstration, we're emitting an event
+        emit SignalSubscribed(signalId, msg.sender);
+    }
+
+    // Unsubscribe from a signal (not implemented in this example)
+    // function unsubscribeFromSignal(uint256 signalId) external {}
+
+    // Get total number of signals
+    function getTotalSignals() external view returns (uint256) {
+        return totalSignals;
+    }
+
+    // Get signal details by ID
+    function getSignal(uint256 signalId) external view returns (address provider, string memory symbol, uint256 timestamp, string memory content, bool isActive) {
+        Signal memory signal = signals[signalId];
+        return (signal.provider, signal.symbol, signal.timestamp, signal.content, signal.isActive);
+    }
+
+    // Withdraw ETH from the contract (only owner)
+    function withdraw() external onlyOwner {
+        payable(owner()).transfer(address(this).balance);
+    }
+
+    // Receive function to accept ETH payments
+    receive() external payable {}
+
+    // Signal subscribed event
+    event SignalSubscribed(uint256 indexed signalId, address indexed subscriber);
+}
